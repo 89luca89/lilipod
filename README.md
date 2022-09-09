@@ -1,6 +1,7 @@
 # Scatman
 
-![scatman-icon](https://user-images.githubusercontent.com/598882/189237274-38bb362c-d15a-4041-9209-126162dd7572.png)
+![scatman-icon-stroked](https://user-images.githubusercontent.com/598882/189295656-c7edb435-a25e-49f2-885c-5eb02fa97b1b.png)
+
 
 Scatman aims to be a **very** simple (as in few features) chroot and image manager.
 
