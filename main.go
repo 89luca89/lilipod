@@ -91,6 +91,7 @@ func newApp() (*cobra.Command, error) {
 		cmd.NewEnterCommand(),
 		cmd.NewExecCommand(),
 		cmd.NewImagesCommand(),
+		cmd.NewInspectCommand(),
 		cmd.NewLogsCommand(),
 		cmd.NewPsCommand(),
 		cmd.NewPullCommand(),
