@@ -54,6 +54,15 @@ func NewStopCommand() *cobra.Command {
 }
 
 func stop(cmd *cobra.Command, arguments []string) error {
+	success, err := utils.EnsureRootlesskit(true)
+	if err != nil {
+		return err
+	}
+
+	if success {
+		return nil
+	}
+
 	stopAll, err := cmd.Flags().GetBool("all")
 	if err != nil {
 		return err
