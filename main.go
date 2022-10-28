@@ -56,6 +56,7 @@ func help(*cobra.Command) error {
   scatman [options] [command]
 
 Available Commands:
+  build       Build an image from a dockerfile
   cp          Copy files/folders between a chroot and the local filesystem
   create      Create but do not start a chroot
   exec        Run a process in a running chroot
@@ -87,6 +88,7 @@ func newApp() (*cobra.Command, error) {
 
 	rootCmd.SetUsageFunc(help)
 	rootCmd.AddCommand(
+		cmd.NewBuildCommand(),
 		cmd.NewCreateCommand(),
 		cmd.NewEnterCommand(),
 		cmd.NewExecCommand(),
