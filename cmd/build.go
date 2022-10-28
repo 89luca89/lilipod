@@ -26,7 +26,7 @@ Examples:
 
 func NewBuildCommand() *cobra.Command {
 	var buildCommand = &cobra.Command{
-		Use:              "scatman build [options] path",
+		Use:              "build [options] path",
 		Short:            "Build an image from a dockerfile",
 		RunE:             build,
 		SilenceUsage:     true,
