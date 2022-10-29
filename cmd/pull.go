@@ -257,6 +257,8 @@ func pull(cmd *cobra.Command, arguments []string) error {
 		return nil
 	}
 
+	// fmt.Println("arguments: ", arguments);
+
 	for _, image := range arguments {
 		// prepare to save manifest to temp file
 		file, err := ioutil.TempFile(os.TempDir(), "scatman")
@@ -307,7 +309,7 @@ func pull(cmd *cobra.Command, arguments []string) error {
 		}
 
 		log.Printf("Trying to pull %s ...\n", image)
-		// interpre downloaded manifest, and download all the blobs
+		// interpret downloaded manifest, and download all the blobs
 		err = interpretManifest(file.Name(), pullImage)
 		if err != nil {
 			os.RemoveAll(targetDIR)
