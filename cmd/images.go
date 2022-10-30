@@ -42,6 +42,26 @@ func NewImagesCommand() *cobra.Command {
 
 	return imagesCommand
 }
+func imageIsLocal(imageName string) bool{
+	imageDIR := "docker.io/moby/buildkit:latest"
+	files, err := os.ReadDir(imageDIR);
+	if(err != nil){
+		return false;
+	}
+	for _, file := range files{
+		if(file.IsDir()){
+			continue;
+		}
+		decodedImageName, err_two := base64.StdEncoding.DecodeString(file.Name());
+		if(err_two != nil){
+			return false;
+		}
+		if (strings.Contains(string(decodedImageName[:]), imageName)){
+			return true;
+		}
+	}
+	return false;
+} // end imageIsLocal
 
 func images(cmd *cobra.Command, arguments []string) error {
 	images, err := os.ReadDir(pullutils.ImageDir)

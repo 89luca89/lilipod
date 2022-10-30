@@ -41,7 +41,8 @@ func NewBuildCommand() *cobra.Command {
 }
 
 func build(cmd *cobra.Command, arguments []string) error {
-	pullArgs := []string{"docker.io/moby/buildkit:latest"};
+	imageName := "docker.io/moby/buildkit:latest"
+	pullArgs := []string{imageName};
 	err := pull(cmd, pullArgs);
 	if err != nil{
 		return err
