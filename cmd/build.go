@@ -43,10 +43,13 @@ func NewBuildCommand() *cobra.Command {
 func build(cmd *cobra.Command, arguments []string) error {
 	imageName := "docker.io/moby/buildkit:latest"
 	pullArgs := []string{imageName};
-	err := pull(cmd, pullArgs);
-	if err != nil{
-		return err
+	if(!isImageLocal(imageName)){
+		err := pull(cmd, pullArgs);
+		if err != nil{
+			return err
+		}
 	}
+
 	// TODO: create (with volume)
 	// TODO: run 
 	// TODO: store the output
