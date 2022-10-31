@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 	// "strings"
-
+	"github.com/89luca89/scatman/pkg/pullutils"
 	// "github.com/89luca89/scatman/pkg/utils"
 	"github.com/spf13/cobra"
 )
@@ -43,7 +43,7 @@ func NewBuildCommand() *cobra.Command {
 func build(cmd *cobra.Command, arguments []string) error {
 	imageName := "docker.io/moby/buildkit:latest"
 	pullArgs := []string{imageName};
-	if(!isImageLocal(imageName)){
+	if(!pullutils.isImageLocal(imageName)){
 		err := pull(cmd, pullArgs);
 		if err != nil{
 			return err

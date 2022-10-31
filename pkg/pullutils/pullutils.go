@@ -247,3 +247,28 @@ func DownloadManifest(url string, filename *os.File, token string) error {
 
 	return err
 }
+
+func isImageLocal(imageName string) bool{
+	// testImageName := "docker.io/moby/buildkit:latest"
+	files, err := os.ReadDir(ImageDir);
+	if(err != nil){
+		log.Printf("ERROR: %v", err)
+		return false;
+	}
+	for _, file := range files{
+		if(!file.IsDir()){
+			continue;
+		}
+
+		decodedImageName, err_two := base64.StdEncoding.DecodeString(file.Name());
+		log.Println("decodedImageName: ", string(decodedImageName[:]))
+		if(err_two != nil){
+			return false;
+		}
+
+		if (strings.Contains(string(decodedImageName[:]), imageName)){
+			return true;
+		}
+	}
+	return false;
+} // end isImageLocal
