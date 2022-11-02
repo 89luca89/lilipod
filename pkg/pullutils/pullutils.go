@@ -247,4 +247,3 @@ func DownloadManifest(url string, filename *os.File, token string) error {
 
 	return err
 }
-
