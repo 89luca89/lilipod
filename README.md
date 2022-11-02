@@ -203,7 +203,6 @@ This obviously is a completely useless and arbitrary metric compared to the diff
 
 For now:
 
-- `create` will fail if the image does not exist, `pull` is not automatic
 - `pull` does not have [shortnames](https://github.com/containers/shortnames) support (yet)
 - by nature this tool does not use stuff come `overlayfs` so **there is no deduplication**
 
