@@ -88,7 +88,6 @@ func newApp() (*cobra.Command, error) {
 
 	rootCmd.SetUsageFunc(help)
 	rootCmd.AddCommand(
-		cmd.NewBuildCommand(),
 		cmd.NewCreateCommand(),
 		cmd.NewEnterCommand(),
 		cmd.NewExecCommand(),

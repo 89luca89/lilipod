@@ -143,6 +143,15 @@ func create(cmd *cobra.Command, arguments []string) error {
 
 	image := cmd.Flags().Args()[0]
 
+	if(!isImageLocal(image)){
+		pullArgs := []string{image};
+		err := pull(cmd, pullArgs);
+		if err != nil{
+			log.Printf("ERROR: %v", err)
+			return err
+		}
+	}
+
 	entrypoint := cmd.Flags().Args()[1:]
 	if len(entrypoint) == 0 {
 		entrypoint = []string{"/bin/sh"}
