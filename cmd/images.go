@@ -139,6 +139,7 @@ func isImageLocal(imageName string) bool{
 		decodedImageName, err_two := base64.StdEncoding.DecodeString(file.Name());
 		// log.Println("decodedImageName: ", string(decodedImageName[:]))
 		if(err_two != nil){
+			log.Printf("ERROR: %v", err_two)
 			return false;
 		}
 
