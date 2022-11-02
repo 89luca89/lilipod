@@ -43,7 +43,6 @@ func NewImagesCommand() *cobra.Command {
 	return imagesCommand
 }
 
-
 func images(cmd *cobra.Command, arguments []string) error {
 	images, err := os.ReadDir(pullutils.ImageDir)
 	if err != nil {
