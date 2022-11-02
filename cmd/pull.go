@@ -257,8 +257,6 @@ func pull(cmd *cobra.Command, arguments []string) error {
 		return nil
 	}
 
-	// fmt.Println("arguments: ", arguments);
-
 	for _, image := range arguments {
 		// prepare to save manifest to temp file
 		file, err := ioutil.TempFile(os.TempDir(), "scatman")
