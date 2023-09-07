@@ -1,0 +1,135 @@
+---
+# All possible options can be found here
+# https://github.com/golangci/golangci-lint/blob/master/.golangci.reference.yml
+# Deprecated
+# - deadcode
+# - golint
+# - interfacer
+# - maligned
+# - scopelint
+# - structcheck
+# - varcheck
+# - exhaustivestruct
+# - ifshort
+# - nosnakecase
+linters-settings:
+  # Allow names like fd for file descriptors, or id for identifiers.
+  varnamelen:
+    min-name-length:  2
+  nestif:
+    min-complexity: 10
+  gosec:
+    excludes:
+      - G204  # We actually need to launch programs with a variable name.
+      - G301  # We actually need to set permissions higher than 0750.
+      - G302  # We actually need to set permissions higher than 0600.
+      - G304  # Yes we use variables for file names.
+      - G401  # We actually use md5 only to create IDs, it's ok.
+      - G501  # like above.
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+linters:
+  # enable-all: true
+  fase: false
+  disable:
+    - exhaustruct       # too noisy
+    - gomnd             # too noisy
+    - forbidigo         # I need to use println this is a CLI app.
+    - gochecknoglobals  # Sometimes they are useful.
+    - goerr113          # I do use fmt.Errorf, allocating all of them at the start is counter productive.
+    - cyclop            # To be enabled in the future
+    - funlen            # To be enabled in the future
+    - gocognit          # To be enabled in the future
+    - gocyclo           # To be enabled in the future
+    - wrapcheck         # To be enabled in the future
+  enable:
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - containedctx
+    - contextcheck
+    - decorder
+    - dogsled
+    - dupl
+    - dupword
+    - durationcheck
+    - errcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - execinquery
+    - exhaustive
+    - exportloopref
+    - forcetypeassert
+    - gci
+    - ginkgolinter
+    - gocheckcompilerdirectives
+    - gochecknoinits
+    - goconst
+    - gocritic
+    - godot
+    - godox
+    - gofmt
+    - gofumpt
+    - goheader
+    - goimports
+    - gomoddirectives
+    - gomodguard
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - gosmopolitan
+    - govet
+    - grouper
+    - importas
+    - ineffassign
+    - interfacebloat
+    - ireturn
+    - lll
+    - loggercheck
+    - maintidx
+    - makezero
+    - mirror
+    - misspell
+    - musttag
+    - nakedret
+    - nestif
+    - nilerr
+    - nilnil
+    - nlreturn
+    - noctx
+    - nolintlint
+    - nonamedreturns
+    - nosprintfhostport
+    - paralleltest
+    - prealloc
+    - predeclared
+    - promlinter
+    - reassign
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - staticcheck
+    - stylecheck
+    - tagalign
+    - tagliatelle
+    - tenv
+    - testableexamples
+    - testpackage
+    - thelper
+    - tparallel
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - usestdlibvars
+    - varnamelen
+    - wastedassign
+    - whitespace
+    - wsl
+    - zerologlint
