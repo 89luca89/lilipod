@@ -16,7 +16,6 @@
 tags
 dist
 lilipod
-*.sh
 TODO.*
 bin/
 pkg/constants/pty.tar.gz
