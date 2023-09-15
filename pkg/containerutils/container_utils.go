@@ -138,7 +138,7 @@ func GetContainerInfo(
 		// in case of invalid container, let's cleanup the mess.
 		logging.LogWarning("found invalid container %s, cleaning up", container)
 
-		return nil, exec.Command("/proc/self/exe", "rm", container).Run()
+		return nil, exec.Command(os.Args[0], "rm", container).Run()
 	}
 
 	if !filterContainer(config, filters) {
@@ -566,7 +566,7 @@ func generateEnterCommand(config utils.Config) (*exec.Cmd, error) {
 	}
 
 	// this is our child process that will enter the container effectively
-	cmd := exec.Command("/proc/self/exe",
+	cmd := exec.Command(os.Args[0],
 		"--log-level", logging.GetLogLevel(),
 		"enter",
 		"--config", string(configArg))

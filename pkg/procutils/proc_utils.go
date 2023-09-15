@@ -54,7 +54,7 @@ func EnsureFakeRoot(interactive bool) (bool, error) {
 
 		args := []string{"rootless-helper", "--log-level", logging.GetLogLevel()}
 		args = append(args, os.Args...)
-		cmd = exec.Command("/proc/self/exe", args...)
+		cmd = exec.Command(os.Args[0], args...)
 		cmd.Env = os.Environ()
 		cmd.Env = append(cmd.Env, "ROOTFUL=false")
 		cmd.Env = append(cmd.Env, "PARENT_UID_MAP="+strings.Join(userMap, ":"))

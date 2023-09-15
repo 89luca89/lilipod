@@ -94,7 +94,7 @@ func stop(cmd *cobra.Command, arguments []string) error {
 				// in case of invalid container, let's cleanup the mess.
 				logging.LogWarning("found invalid container %s, cleaning up", container)
 
-				return exec.Command("/proc/self/exe", "rm", container).Run()
+				return exec.Command(os.Args[0], "rm", container).Run()
 			}
 
 			err = containerutils.Stop(container, force, timeout, config.Stopsignal)

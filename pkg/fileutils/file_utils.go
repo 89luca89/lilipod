@@ -401,9 +401,8 @@ func UntarFile(path string, target string, userns string) error {
 		return err
 	}
 
-	cmd := exec.Command("tar", "--exclude=dev/*", "-xf", path, "-C", target)
-
 	if userns != constants.KeepID {
+		cmd := exec.Command("tar", "--exclude=dev/*", "-xf", path, "-C", target)
 		logging.LogDebug("no keep-id specified, simply perform %v", cmd.Args)
 
 		out, err := cmd.CombinedOutput()
@@ -413,6 +412,16 @@ func UntarFile(path string, target string, userns string) error {
 
 		return nil
 	}
+
+	command := "/bin/sh"
+	args := []string{
+		"-c",
+		"mkdir -p " + target + " &&" +
+			"chown -R root:root " + target + " &&" +
+			"tar --exclude=dev/* -xf " + path + " -C " + target,
+	}
+
+	cmd := exec.Command(command, args...)
 
 	// we need to unpack using keep-id in order to keep consistency
 	cloneFlags := syscall.CLONE_NEWUTS | syscall.CLONE_NEWNS

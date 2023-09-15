@@ -57,7 +57,7 @@ func rootlessHelper(_ *cobra.Command, arguments []string) error {
 func parent(arguments []string) error {
 	logging.LogDebug("parent: preparing to fork child")
 
-	cmd := exec.Command("/proc/self/exe", append([]string{
+	cmd := exec.Command(os.Args[0], append([]string{
 		"rootless-helper",
 		"--log-level",
 		logging.GetLogLevel(),

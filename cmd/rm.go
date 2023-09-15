@@ -42,7 +42,7 @@ func rm(cmd *cobra.Command, arguments []string) error {
 	}
 
 	if force {
-		err := exec.Command("/proc/self/exe", append([]string{"stop", "-f"}, arguments...)...).Run()
+		err := exec.Command(os.Args[0], append([]string{"stop", "-f"}, arguments...)...).Run()
 		if err != nil {
 			return err
 		}
