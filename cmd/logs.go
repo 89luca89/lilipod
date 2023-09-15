@@ -65,6 +65,11 @@ func logs(cmd *cobra.Command, arguments []string) error {
 		return err
 	}
 
+	_, err = os.Create(containerutils.GetDir(container) + "/current-logs")
+	if err != nil {
+		return err
+	}
+
 	file, err := os.Open(containerutils.GetDir(container) + "/current-logs")
 	if err != nil {
 		return err

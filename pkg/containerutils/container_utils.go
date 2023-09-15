@@ -350,6 +350,13 @@ func Start(interactive, tty bool, config utils.Config) error {
 
 	logging.LogDebug("injecting pty agent")
 
+	err = os.MkdirAll(filepath.Join(path, filepath.Base(constants.PtyAgentPath)), 0755)
+	if err != nil {
+		logging.LogError("failed to create path for pty agent: %v", err)
+
+		return err
+	}
+
 	err = fileutils.WriteFile(filepath.Join(path, constants.PtyAgentPath), ptyFile, 0o755)
 	if err != nil {
 		logging.LogError("failed to inject pty agent: %v", err)
