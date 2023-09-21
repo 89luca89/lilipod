@@ -474,7 +474,7 @@ func setupVolumes(path string, conf utils.Config) error {
 // This will also populate container's /run/.containerenv.
 func SetupRootfs(conf utils.Config) error {
 	path := GetRootfsDir(conf.ID)
-	// this section will make sure that mounts are privare in this mount
+	// this section will make sure that mounts are private in this mount
 	// namespace, so that even with root we do not have pending mounts.
 	logging.LogDebug("remounting %s as private", path)
 
