@@ -373,7 +373,7 @@ Else lilipod will use `XDG_DATA_HOME` or fallback to `$HOME/.local/share/lilipod
 
 # Limitations
 
-- by nature this tool does not use stuff come `overlayfs` so **there is no deduplication between container's rootfs**, but **image layer deduplication is present**
+- by nature this tool does not use stuff like `overlayfs` so **there is no deduplication between container's rootfs**, but **image layer deduplication is present**
 - There is no custom networking, you either share host's network or you're offline
 
 
