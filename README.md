@@ -87,7 +87,7 @@ Lilipod wants to be:
 Well, I felt the need to go deeper in how to download a container image from a registry... then one thing lead to another... and here we are. 👀
 
 Also this is a nice fallback for [Distrobox](https://github.com/89luca89/distrobox) when no container-manager is found, or when it's not possible to install one.  
-Bein a fully self-contained binary that lives in one directory (`LILIPOD_HOME`) it makes it easy to install and remove without package managers.
+Being a fully self-contained binary that lives in one directory (`LILIPOD_HOME`) it makes it easy to install and remove without package managers.
 
 # Getting started
 
