@@ -361,6 +361,20 @@ sys     0m0.450s
 
 ```
 
+```console
+:~$ time (for i in {1..20}; do podman run --rm -ti alpine:latest whoami >/dev/null 2>/dev/null; done)
+
+real    0m10.125s
+user    0m2.606s
+sys     0m1.744s
+:~$ time (for i in {1..20}; do ./lilipod run --rm -ti alpine:latest whoami >/dev/null 2>/dev/null; done)
+
+real    0m6.157s
+user    0m3.545s
+sys     0m2.613s
+
+```
+
 **It takes about 5~8ms to enter a container and execute stuff**
 
 This obviously is a completely useless and arbitrary metric compared to the difference of utility of the two tools.
