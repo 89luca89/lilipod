@@ -53,6 +53,9 @@ func NewCreateCommand() *cobra.Command {
 
 	// This does nothing, it's here for CLI compatibility with podman/docker
 	createCommand.Flags().String("security-opt", "", "")
+	createCommand.Flags().String("pids-limit", "", "")
+	_ = createCommand.Flags().MarkHidden("security-opt")
+	_ = createCommand.Flags().MarkHidden("pids-limit")
 
 	return createCommand
 }
