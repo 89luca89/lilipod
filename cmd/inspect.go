@@ -63,6 +63,7 @@ func inspect(cmd *cobra.Command, arguments []string) error {
 
 	format = strings.ReplaceAll(format, ".State.Status", ".Status")
 	format = strings.ReplaceAll(format, ".Config.Env", ".Env")
+	format = strings.ReplaceAll(format, ".Config.Labels", ".Labels")
 
 	var output string
 

@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/89luca89/lilipod/pkg/constants"
@@ -27,28 +28,28 @@ import (
 // oci-registry and images compliant, but doesn't need
 // to create oci-compliant containers.
 type Config struct {
-	Env        []string `json:"env"`
-	Cgroup     string   `json:"cgroup"`
-	Created    string   `json:"created"`
-	Gidmap     string   `json:"gidmap"`
-	Hostname   string   `json:"hostname"`
-	ID         string   `json:"id"`
-	Image      string   `json:"image"`
-	Ipc        string   `json:"ipc"`
-	Names      string   `json:"names"`
-	Network    string   `json:"network"`
-	Pid        string   `json:"pid"`
-	Privileged bool     `json:"privileged"`
-	Size       string   `json:"size"`
-	Status     string   `json:"status"`
-	Time       string   `json:"time"`
-	Uidmap     string   `json:"uidmap"`
-	User       string   `json:"user"`
-	Userns     string   `json:"userns"`
-	Workdir    string   `json:"workdir"`
-	Stopsignal string   `json:"stopsignal"`
-	Mounts     []string `json:"mounts"`
-	Labels     []string `json:"labels"`
+	Env        []string          `json:"env"`
+	Cgroup     string            `json:"cgroup"`
+	Created    string            `json:"created"`
+	Gidmap     string            `json:"gidmap"`
+	Hostname   string            `json:"hostname"`
+	ID         string            `json:"id"`
+	Image      string            `json:"image"`
+	Ipc        string            `json:"ipc"`
+	Names      string            `json:"names"`
+	Network    string            `json:"network"`
+	Pid        string            `json:"pid"`
+	Privileged bool              `json:"privileged"`
+	Size       string            `json:"size"`
+	Status     string            `json:"status"`
+	Time       string            `json:"time"`
+	Uidmap     string            `json:"uidmap"`
+	User       string            `json:"user"`
+	Userns     string            `json:"userns"`
+	Workdir    string            `json:"workdir"`
+	Stopsignal string            `json:"stopsignal"`
+	Mounts     []string          `json:"mounts"`
+	Labels     map[string]string `json:"labels"`
 	// entry point related
 	Entrypoint []string `json:"entrypoint"`
 }
@@ -147,7 +148,7 @@ func GetDefaultConfig() Config {
 		Workdir:    "/",
 		Stopsignal: "SIGTERM",
 		Mounts:     []string{},
-		Labels:     []string{},
+		Labels:     map[string]string{},
 		Entrypoint: []string{"/bin/sh"},
 	}
 }
@@ -365,4 +366,27 @@ func setupBusybox(dependencies []string) error {
 	}
 
 	return nil
+}
+
+func MapToList(input map[string]string) []string {
+	result := []string{}
+
+	for k, v := range input {
+		result = append(result, k+"="+v)
+	}
+
+	return result
+}
+
+func ListToMap(input []string) map[string]string {
+	result := map[string]string{}
+
+	for _, v := range input {
+		key := strings.Split(v, "=")[0]
+		value := strings.Split(v, "=")[1:]
+
+		result[key] = strings.Join(value, "=")
+	}
+
+	return result
 }

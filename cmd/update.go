@@ -209,7 +209,7 @@ func update(cmd *cobra.Command, arguments []string) error {
 	}
 
 	if cmd.Flags().Lookup("label").Changed {
-		config.Labels = label
+		config.Labels = utils.ListToMap(label)
 	}
 
 	logging.LogDebug(

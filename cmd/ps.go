@@ -191,7 +191,7 @@ func doContainerRow(
 	}
 	// continue with table
 
-	labels := strings.Join(config.Labels, ",")
+	labels := strings.Join(utils.MapToList(config.Labels), ",")
 	if len(labels) > 16 && !notrunc {
 		labels = labels[:15] + "..."
 	}

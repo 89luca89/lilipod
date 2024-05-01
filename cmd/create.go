@@ -217,7 +217,7 @@ func create(cmd *cobra.Command, arguments []string) error {
 		Workdir:    "/",
 		Stopsignal: stopsignal,
 		Mounts:     append(mount, volume...),
-		Labels:     label,
+		Labels:     utils.ListToMap(label),
 		// entry point related
 		Entrypoint: append(configEntrypoint, args...),
 	}

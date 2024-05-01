@@ -18,7 +18,7 @@ import (
 	"github.com/89luca89/lilipod/pkg/procutils"
 )
 
-// ReadFile will return the content of input file or error.
+// eadFile will return the content of input file or error.
 // This is a linux-only implementation using syscalls for performance benefits.
 func ReadFile(path string) ([]byte, error) {
 	var stat syscall.Stat_t
