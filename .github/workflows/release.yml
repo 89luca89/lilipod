@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to create and upload assets to releases
+      attestations: write # to upload assets attestation for build provenance
+      id-token: write # grant additional permission to attestation action to mint the OIDC token permission
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.21
+
+      - name: Install Build Dependencies
+        run: |
+            sudo apt-get update
+            sudo apt-get install -y make
+
+      # currently, only Linux is being built, the format lilipod-<os>-<arch> 
+      # is hardcoded for now
+      - name: Build
+        run: |
+          RELEASE_VERSION=${{ github.ref_name }}
+          if [[ "$RELEASE_VERSION" == v* ]]; then
+            RELEASE_VERSION=${RELEASE_VERSION#v}
+          fi
+          RELEASE_VERSION=$RELEASE_VERSION make all
+          mv lilipod lilipod-linux-amd64
+
+      - name: Calculate and Save Checksums
+        run: |
+          sha256sum lilipod-linux-amd64 >> checksums.txt
+
+      - name: Create Release
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" --generate-notes lilipod-linux-amd64 checksums.txt
+
+      - name: Attest Release Files
+        id: attest
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: 'lilipod-linux-amd64, checksums.txt'
