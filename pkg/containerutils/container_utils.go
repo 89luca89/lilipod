@@ -438,12 +438,8 @@ func Exec(pid int, interactive bool, tty bool, config utils.Config) error {
 }
 
 // Stop will find all the processes in given container and will stop them.
-func Stop(name string, force bool, timeout int, signal string) error {
+func Stop(name string, force bool, timeout int) error {
 	logging.LogDebug("stopping container %s", name)
-
-	if signal == "" {
-		signal = "SIGTERM"
-	}
 
 	containerPid, err := GetPid(name)
 	if err != nil {
@@ -456,12 +452,12 @@ func Stop(name string, force bool, timeout int, signal string) error {
 	if force {
 		logging.LogDebug("killing process with pid: %d", containerPid)
 
-		return exec.Command("kill", "-SIGKILL", strconv.Itoa(containerPid)).Run()
+		return syscall.Kill(containerPid, syscall.SIGKILL)
 	}
 
 	logging.LogDebug("sending SIGTERM to pid: %d", containerPid)
 
-	err = exec.Command("kill", "-"+signal, strconv.Itoa(containerPid)).Run()
+	err = syscall.Kill(containerPid, syscall.SIGTERM)
 	if err != nil {
 		return err
 	}
@@ -470,7 +466,7 @@ func Stop(name string, force bool, timeout int, signal string) error {
 		if timeout <= 0 {
 			logging.LogWarning("timeout exceeded, force killing")
 
-			return exec.Command("kill", "-SIGKILL", strconv.Itoa(containerPid)).Run()
+			return syscall.Kill(containerPid, syscall.SIGKILL)
 		}
 
 		time.Sleep(time.Second)
