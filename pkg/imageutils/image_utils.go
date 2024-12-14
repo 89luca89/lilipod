@@ -369,6 +369,10 @@ func findExistingLayer(targetDIR, filename string) []string {
 			matchingFiles = append(matchingFiles, name)
 		}
 
+		if err != nil {
+			return err
+		}
+
 		return nil
 	})
 
