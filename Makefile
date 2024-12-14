@@ -26,3 +26,6 @@ pty:
 	@rm -f pty.tar.gz
 	CGO_ENABLED=0 go build -mod vendor -gcflags=all="-l -B -C" -ldflags="-s -w -X 'main.version=$${RELEASE_VERSION:-0.0.0}'" -o pty ptyagent/main.go ptyagent/pty.go
 	tar czfv pty.tar.gz pty
+
+trivy:
+	@trivy fs --scanners vuln .

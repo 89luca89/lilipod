@@ -4,41 +4,19 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
+	"unicode"
 
 	"github.com/jedib0t/go-pretty/v6/text"
 )
 
-// Row defines a single row in the Table.
-type Row []interface{}
-
-func (r Row) findColumnNumber(colName string) int {
-	for colIdx, col := range r {
-		if fmt.Sprint(col) == colName {
-			return colIdx + 1
-		}
-	}
-	return 0
-}
-
-// RowPainter is a custom function that takes a Row as input and returns the
-// text.Colors{} to use on the entire row
-type RowPainter func(row Row) text.Colors
-
-// rowStr defines a single row in the Table comprised of just string objects.
-type rowStr []string
-
-// areEqual returns true if the contents of the 2 given columns are the same
-func (row rowStr) areEqual(colIdx1 int, colIdx2 int) bool {
-	return colIdx1 >= 0 && colIdx2 < len(row) && row[colIdx1] == row[colIdx2]
-}
-
-// Table helps print a 2-dimensional array in a human readable pretty-table.
+// Table helps print a 2-dimensional array in a human-readable pretty-table.
 type Table struct {
 	// allowedRowLength is the max allowed length for a row (or line of output)
 	allowedRowLength int
 	// enable automatic indexing of the rows and columns like a spreadsheet?
 	autoIndex bool
-	// autoIndexVIndexMaxLength denotes the length in chars for the last rownum
+	// autoIndexVIndexMaxLength denotes the length in chars for the last row
 	autoIndexVIndexMaxLength int
 	// caption stores the text to be rendered just below the table; and doesn't
 	// get used when rendered as a CSV
@@ -50,6 +28,8 @@ type Table struct {
 	// columnConfigMap stores the custom-configuration by column
 	// number and is generated before rendering
 	columnConfigMap map[int]ColumnConfig
+	// firstRowOfPage tells if the renderer is on the first row of a page?
+	firstRowOfPage bool
 	// htmlCSSClass stores the HTML CSS Class to use on the <table> node
 	htmlCSSClass string
 	// indexColumn stores the number of the column considered as the "index"
@@ -65,14 +45,12 @@ type Table struct {
 	numLinesRendered int
 	// outputMirror stores an io.Writer where the "Render" functions would write
 	outputMirror io.Writer
-	// pageSize stores the maximum lines to render before rendering the header
-	// again (to denote a page break) - useful when you are dealing with really
-	// long tables
-	pageSize int
+	// pager controls how the output is separated into pages
+	pager pager
 	// rows stores the rows that make up the body (in string form)
 	rows []rowStr
 	// rowsColors stores the text.Colors over-rides for each row as defined by
-	// rowPainter
+	// rowPainter or rowPainterWithAttributes
 	rowsColors []text.Colors
 	// rowsConfigs stores RowConfig for each row
 	rowsConfigMap map[int]RowConfig
@@ -93,6 +71,8 @@ type Table struct {
 	// rowPainter is a custom function that given a Row, returns the colors to
 	// use on the entire row
 	rowPainter RowPainter
+	// rowPainterWithAttributes is same as rowPainter, but with attributes
+	rowPainterWithAttributes RowPainterWithAttributes
 	// rowSeparator is a dummy row that contains the separator columns (dashes
 	// that make up the separator between header/body/footer
 	rowSeparator rowStr
@@ -101,11 +81,15 @@ type Table struct {
 	separators map[int]bool
 	// sortBy stores a map of Column
 	sortBy []SortBy
+	// sortedRowIndices is the output of sorting
+	sortedRowIndices []int
 	// style contains all the strings used to draw the table, and more
 	style *Style
 	// suppressEmptyColumns hides columns which have no content on all regular
 	// rows
 	suppressEmptyColumns bool
+	// suppressTrailingSpaces removes all trailing spaces from the end of the last column
+	suppressTrailingSpaces bool
 	// title contains the text to appear above the table
 	title string
 }
@@ -164,14 +148,15 @@ func (t *Table) AppendRows(rows []Row, config ...RowConfig) {
 // append is a separator, it will not be rendered in addition to the usual table
 // separator.
 //
-//******************************************************************************
+// ******************************************************************************
 // Please note the following caveats:
-// 1. SetPageSize(): this may end up creating consecutive separator rows near
-//    the end of a page or at the beginning of a page
-// 2. SortBy(): since SortBy could inherently alter the ordering of rows, the
-//    separators may not appear after the row it was originally intended to
-//    follow
-//******************************************************************************
+//  1. SetPageSize(): this may end up creating consecutive separator rows near
+//     the end of a page or at the beginning of a page
+//  2. SortBy(): since SortBy could inherently alter the ordering of rows, the
+//     separators may not appear after the row it was originally intended to
+//     follow
+//
+// ******************************************************************************
 func (t *Table) AppendSeparator() {
 	if t.separators == nil {
 		t.separators = make(map[int]bool)
@@ -181,9 +166,54 @@ func (t *Table) AppendSeparator() {
 	}
 }
 
+// ImportGrid helps import 1d or 2d arrays as rows.
+func (t *Table) ImportGrid(grid interface{}) bool {
+	rows := objAsSlice(grid)
+	if rows == nil {
+		return false
+	}
+	addedRows := false
+	for _, row := range rows {
+		rowAsSlice := objAsSlice(row)
+		if rowAsSlice != nil {
+			t.AppendRow(rowAsSlice)
+		} else if row != nil {
+			t.AppendRow(Row{row})
+		}
+		addedRows = true
+	}
+	return addedRows
+}
+
 // Length returns the number of rows to be rendered.
 func (t *Table) Length() int {
 	return len(t.rowsRaw)
+}
+
+// Pager returns an object that splits the table output into pages and
+// lets you move back and forth through them.
+func (t *Table) Pager(opts ...PagerOption) Pager {
+	for _, opt := range opts {
+		opt(t)
+	}
+
+	// use a temporary page separator for splitting up the pages
+	tempPageSep := fmt.Sprintf("%p // page separator // %d", t.rows, time.Now().UnixNano())
+
+	// backup
+	origOutputMirror, origPageSep := t.outputMirror, t.Style().Box.PageSeparator
+	// restore on exit
+	defer func() {
+		t.outputMirror = origOutputMirror
+		t.Style().Box.PageSeparator = origPageSep
+	}()
+	// override
+	t.outputMirror = nil
+	t.Style().Box.PageSeparator = tempPageSep
+	// render
+	t.pager.pages = strings.Split(t.Render(), tempPageSep)
+
+	return &t.pager
 }
 
 // ResetFooters resets and clears all the Footer rows appended earlier.
@@ -205,6 +235,8 @@ func (t *Table) ResetRows() {
 // SetAllowedRowLength sets the maximum allowed length or a row (or line of
 // output) when rendered as a table. Rows that are longer than this limit will
 // be "snipped" to the length. Length has to be a positive value to take effect.
+//
+// Deprecated: in favor if Style().Size.WidthMax
 func (t *Table) SetAllowedRowLength(length int) {
 	t.allowedRowLength = length
 }
@@ -228,7 +260,7 @@ func (t *Table) SetColumnConfigs(configs []ColumnConfig) {
 	t.columnConfigs = configs
 }
 
-// SetHTMLCSSClass sets the the HTML CSS Class to use on the <table> node
+// SetHTMLCSSClass sets the HTML CSS Class to use on the <table> node
 // when rendering the Table in HTML format.
 //
 // Deprecated: in favor of Style().HTML.CSSClass
@@ -246,6 +278,7 @@ func (t *Table) SetIndexColumn(colNum int) {
 // in addition to returning a string.
 func (t *Table) SetOutputMirror(mirror io.Writer) {
 	t.outputMirror = mirror
+	t.pager.SetOutputMirror(mirror)
 }
 
 // SetPageSize sets the maximum number of lines to render before rendering the
@@ -253,15 +286,40 @@ func (t *Table) SetOutputMirror(mirror io.Writer) {
 // long list of rows that can span pages. Please note that the pagination logic
 // will not consider Header/Footer lines for paging.
 func (t *Table) SetPageSize(numLines int) {
-	t.pageSize = numLines
+	t.pager.size = numLines
 }
 
-// SetRowPainter sets the RowPainter function which determines the colors to use
-// on a row. Before rendering, this function is invoked on all rows and the
-// color of each row is determined. This color takes precedence over other ways
-// to set color (ColumnConfig.Color*, SetColor*()).
-func (t *Table) SetRowPainter(painter RowPainter) {
-	t.rowPainter = painter
+// SetRowPainter sets up the function which determines the colors to use on a
+// row. Before rendering, this function is invoked on all rows and the color
+// of each row is determined. This color takes precedence over other ways to
+// set color (ColumnConfig.Color*, SetColor*()).
+func (t *Table) SetRowPainter(painter interface{}) {
+	// TODO: fix interface on major version bump to accept only
+	// one type of RowPainter: RowPainterWithAttributes renamed to RowPainter
+
+	// reset both so only one is set at any given time
+	t.rowPainter = nil
+	t.rowPainterWithAttributes = nil
+
+	// if called as SetRowPainter(RowPainter(func...))
+	switch painter.(type) {
+	case RowPainter:
+		t.rowPainter = painter.(RowPainter)
+		return
+	case RowPainterWithAttributes:
+		t.rowPainterWithAttributes = painter.(RowPainterWithAttributes)
+		return
+	}
+
+	// if called as SetRowPainter(func...)
+	switch fmt.Sprintf("%T", painter) {
+	case "func(table.Row) text.Colors":
+		t.rowPainter = painter.(func(row Row) text.Colors)
+		return
+	case "func(table.Row, table.RowAttributes) text.Colors":
+		t.rowPainterWithAttributes = painter.(func(row Row, attr RowAttributes) text.Colors)
+		return
+	}
 }
 
 // SetStyle overrides the DefaultStyle with the provided one.
@@ -287,6 +345,11 @@ func (t *Table) Style() *Style {
 		tempStyle := StyleDefault
 		t.style = &tempStyle
 	}
+	// override WidthMax with allowedRowLength until allowedRowLength is
+	// removed from code
+	if t.allowedRowLength > 0 {
+		t.style.Size.WidthMax = t.allowedRowLength
+	}
 	return t.style
 }
 
@@ -294,6 +357,11 @@ func (t *Table) Style() *Style {
 // regular rows.
 func (t *Table) SuppressEmptyColumns() {
 	t.suppressEmptyColumns = true
+}
+
+// SuppressTrailingSpaces removes all trailing spaces from the output.
+func (t *Table) SuppressTrailingSpaces() {
+	t.suppressTrailingSpaces = true
 }
 
 func (t *Table) getAlign(colIdx int, hint renderHint) text.Align {
@@ -312,6 +380,12 @@ func (t *Table) getAlign(colIdx int, hint renderHint) text.Align {
 			align = text.AlignRight
 		} else if hint.isAutoIndexRow {
 			align = text.AlignCenter
+		} else if hint.isHeaderRow {
+			align = t.style.Format.HeaderAlign
+		} else if hint.isFooterRow {
+			align = t.style.Format.FooterAlign
+		} else {
+			align = t.style.Format.RowAlign
 		}
 	}
 	return align
@@ -388,11 +462,11 @@ func (t *Table) getBorderRight(hint renderHint) string {
 
 func (t *Table) getColumnColors(colIdx int, hint renderHint) text.Colors {
 	if hint.isBorderOrSeparator() {
-		if colors := t.getColumnColorsForBorderOrSeparator(colIdx, hint); colors != nil {
+		if colors := t.getColumnColorsForBorderOrSeparator(hint); colors != nil {
 			return colors
 		}
 	}
-	if t.rowPainter != nil && hint.isRegularNonSeparatorRow() && !t.isIndexColumn(colIdx, hint) {
+	if t.hasRowPainter() && hint.isRegularNonSeparatorRow() && !t.isIndexColumn(colIdx, hint) {
 		if colors := t.rowsColors[hint.rowNumber-1]; colors != nil {
 			return colors
 		}
@@ -410,7 +484,7 @@ func (t *Table) getColumnColors(colIdx int, hint renderHint) text.Colors {
 	return nil
 }
 
-func (t *Table) getColumnColorsForBorderOrSeparator(colIdx int, hint renderHint) text.Colors {
+func (t *Table) getColumnColorsForBorderOrSeparator(hint renderHint) text.Colors {
 	if t.style.Options.DoNotColorBordersAndSeparators {
 		return text.Colors{} // not nil to force caller to paint with no colors
 	}
@@ -439,12 +513,9 @@ func (t *Table) getColumnSeparator(row rowStr, colIdx int, hint renderHint) stri
 				separator = t.style.Box.BottomSeparator
 			}
 		} else {
-			separator = t.getColumnSeparatorNonBorder(
-				t.shouldMergeCellsHorizontallyAbove(row, colIdx, hint),
-				t.shouldMergeCellsHorizontallyBelow(row, colIdx, hint),
-				colIdx,
-				hint,
-			)
+			sm1 := t.shouldMergeCellsHorizontallyAbove(row, colIdx, hint)
+			sm2 := t.shouldMergeCellsHorizontallyBelow(row, colIdx, hint)
+			separator = t.getColumnSeparatorNonBorder(sm1, sm2, colIdx, hint)
 		}
 	}
 	return separator
@@ -532,9 +603,9 @@ func (t *Table) getFormat(hint renderHint) text.Format {
 
 func (t *Table) getMaxColumnLengthForMerging(colIdx int) int {
 	maxColumnLength := t.maxColumnLengths[colIdx]
-	maxColumnLength += text.RuneWidthWithoutEscSequences(t.style.Box.PaddingRight + t.style.Box.PaddingLeft)
+	maxColumnLength += text.StringWidthWithoutEscSequences(t.style.Box.PaddingRight + t.style.Box.PaddingLeft)
 	if t.style.Options.SeparateColumns {
-		maxColumnLength += text.RuneWidthWithoutEscSequences(t.style.Box.EmptySeparator)
+		maxColumnLength += text.StringWidthWithoutEscSequences(t.style.Box.EmptySeparator)
 	}
 	return maxColumnLength
 }
@@ -630,6 +701,15 @@ func (t *Table) getVAlign(colIdx int, hint renderHint) text.VAlign {
 			vAlign = cfg.VAlign
 		}
 	}
+	if vAlign == text.VAlignDefault {
+		if hint.isHeaderRow {
+			vAlign = t.style.Format.HeaderVAlign
+		} else if hint.isFooterRow {
+			vAlign = t.style.Format.FooterVAlign
+		} else {
+			vAlign = t.style.Format.RowVAlign
+		}
+	}
 	return vAlign
 }
 
@@ -640,6 +720,10 @@ func (t *Table) hasHiddenColumns() bool {
 		}
 	}
 	return false
+}
+
+func (t *Table) hasRowPainter() bool {
+	return t.rowPainter != nil || t.rowPainterWithAttributes != nil
 }
 
 func (t *Table) hideColumns() map[int]int {
@@ -681,6 +765,13 @@ func (t *Table) isIndexColumn(colIdx int, hint renderHint) bool {
 
 func (t *Table) render(out *strings.Builder) string {
 	outStr := out.String()
+	if t.suppressTrailingSpaces {
+		var trimmed []string
+		for _, line := range strings.Split(outStr, "\n") {
+			trimmed = append(trimmed, strings.TrimRightFunc(line, unicode.IsSpace))
+		}
+		outStr = strings.Join(trimmed, "\n")
+	}
 	if t.outputMirror != nil && len(outStr) > 0 {
 		_, _ = t.outputMirror.Write([]byte(outStr))
 		_, _ = t.outputMirror.Write([]byte("\n"))
@@ -721,7 +812,10 @@ func (t *Table) shouldMergeCellsHorizontallyBelow(row rowStr, colIdx int, hint r
 
 	var rowConfig RowConfig
 	if hint.isSeparatorRow {
-		if hint.isHeaderRow && hint.rowNumber == 0 {
+		if hint.isRegularRow() {
+			rowConfig = t.getRowConfig(renderHint{rowNumber: hint.rowNumber + 1})
+			row = t.getRow(hint.rowNumber, renderHint{})
+		} else if hint.isHeaderRow && hint.rowNumber == 0 {
 			rowConfig = t.getRowConfig(renderHint{isHeaderRow: true, rowNumber: 1})
 			row = t.getRow(0, hint)
 		} else if hint.isHeaderRow && hint.isLastRow {
@@ -733,9 +827,6 @@ func (t *Table) shouldMergeCellsHorizontallyBelow(row rowStr, colIdx int, hint r
 		} else if hint.isFooterRow && hint.rowNumber >= 0 {
 			rowConfig = t.getRowConfig(renderHint{isFooterRow: true, rowNumber: 1})
 			row = t.getRow(hint.rowNumber, renderHint{isFooterRow: true})
-		} else if hint.isRegularRow() {
-			rowConfig = t.getRowConfig(renderHint{rowNumber: hint.rowNumber + 1})
-			row = t.getRow(hint.rowNumber, renderHint{})
 		}
 	}
 
@@ -746,22 +837,41 @@ func (t *Table) shouldMergeCellsHorizontallyBelow(row rowStr, colIdx int, hint r
 }
 
 func (t *Table) shouldMergeCellsVertically(colIdx int, hint renderHint) bool {
-	if t.columnConfigMap[colIdx].AutoMerge && colIdx < t.numColumns {
+	if !t.firstRowOfPage && t.columnConfigMap[colIdx].AutoMerge && colIdx < t.numColumns {
 		if hint.isSeparatorRow {
 			rowPrev := t.getRow(hint.rowNumber-1, hint)
 			rowNext := t.getRow(hint.rowNumber, hint)
 			if colIdx < len(rowPrev) && colIdx < len(rowNext) {
-				return rowPrev[colIdx] == rowNext[colIdx] || "" == rowNext[colIdx]
+				return rowPrev[colIdx] == rowNext[colIdx]
 			}
 		} else {
 			rowPrev := t.getRow(hint.rowNumber-2, hint)
 			rowCurr := t.getRow(hint.rowNumber-1, hint)
 			if colIdx < len(rowPrev) && colIdx < len(rowCurr) {
-				return rowPrev[colIdx] == rowCurr[colIdx] || "" == rowCurr[colIdx]
+				return rowPrev[colIdx] == rowCurr[colIdx]
 			}
 		}
 	}
 	return false
+}
+
+func (t *Table) shouldSeparateRows(rowIdx int, numRows int) bool {
+	// not asked to separate rows and no manually added separator
+	if !t.style.Options.SeparateRows && !t.separators[rowIdx] {
+		return false
+	}
+
+	pageSize := numRows
+	if t.pager.size > 0 {
+		pageSize = t.pager.size
+	}
+	if rowIdx%pageSize == pageSize-1 { // last row of page
+		return false
+	}
+	if rowIdx == numRows-1 { // last row of table
+		return false
+	}
+	return true
 }
 
 func (t *Table) wrapRow(row rowStr) (int, rowStr) {

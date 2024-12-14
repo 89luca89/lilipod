@@ -18,6 +18,7 @@ dist
 lilipod
 TODO.*
 bin/
+.idea/
 pkg/constants/pty.tar.gz
 pty.tar.gz
 pty
