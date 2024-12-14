@@ -1,6 +1,6 @@
 module github.com/89luca89/lilipod
 
-go 1.21
+go 1.23
 
 require (
 	github.com/google/go-containerregistry v0.15.2
