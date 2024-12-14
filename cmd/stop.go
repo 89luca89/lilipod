@@ -4,13 +4,11 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/89luca89/lilipod/pkg/containerutils"
 	"github.com/89luca89/lilipod/pkg/fileutils"
 	"github.com/89luca89/lilipod/pkg/logging"
-	"github.com/89luca89/lilipod/pkg/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -87,17 +85,7 @@ func stop(cmd *cobra.Command, arguments []string) error {
 				return nil
 			}
 
-			configPath := filepath.Join(containerutils.ContainerDir, containerutils.GetID(container), "config")
-
-			config, err := utils.LoadConfig(configPath)
-			if err != nil {
-				// in case of invalid container, let's cleanup the mess.
-				logging.LogWarning("found invalid container %s, cleaning up", container)
-
-				return exec.Command(os.Args[0], "rm", container).Run()
-			}
-
-			err = containerutils.Stop(container, force, timeout, config.Stopsignal)
+			err = containerutils.Stop(container, force, timeout)
 			if err != nil {
 				return err
 			}

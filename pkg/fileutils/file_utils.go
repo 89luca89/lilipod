@@ -18,7 +18,7 @@ import (
 	"github.com/89luca89/lilipod/pkg/procutils"
 )
 
-// eadFile will return the content of input file or error.
+// ReadFile will return the content of input file or error.
 // This is a linux-only implementation using syscalls for performance benefits.
 func ReadFile(path string) ([]byte, error) {
 	var stat syscall.Stat_t
@@ -183,9 +183,13 @@ func CopyFileContainer(src string, dest string) error {
 func DiscUsageMegaBytes(path string) (string, error) {
 	var discUsage int64
 
-	readSize := func(path string, file os.FileInfo, err error) error {
+	readSize := func(_ string, file os.FileInfo, err error) error {
 		if !file.IsDir() {
 			discUsage += file.Size()
+		}
+
+		if err != nil {
+			return err
 		}
 
 		return nil

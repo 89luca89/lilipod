@@ -204,7 +204,6 @@ func EnsureUNIXDependencies(ptyAgent []byte) error {
 	}
 
 	softDependencies := []string{
-		"unshare",
 		"nsenter",
 		"tar",
 	}
@@ -243,20 +242,7 @@ func EnsureUNIXDependencies(ptyAgent []byte) error {
 	logging.LogDebug("ensuring agent pty")
 
 	_, err := os.Stat(filepath.Join(LilipodBinPath, "pty"))
-	ptyVersion := "none"
-
-	if err == nil {
-		out, err := exec.Command(filepath.Join(LilipodBinPath, "pty"), "version").Output()
-		if err != nil {
-			logging.Log("%s: %v", string(out), err)
-
-			return err
-		}
-
-		ptyVersion = string(out)
-	}
-
-	if err != nil || ptyVersion != constants.Version {
+	if err != nil {
 		_ = os.MkdirAll(LilipodBinPath, os.ModePerm)
 
 		logging.LogWarning("failed to find dependency 'pty agent', will inject it")

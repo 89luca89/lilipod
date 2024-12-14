@@ -29,6 +29,8 @@ func EnsureFakeRoot(interactive bool) (bool, error) {
 		(os.Getenv("ROOTFUL") != constants.TrueString ||
 			os.Getenv("UNSHARED") == constants.TrueString) {
 		logging.LogDebug("we're 0:0")
+		logging.LogDebug(os.Getenv("ROOTFUL"))
+		logging.LogDebug(os.Getenv("UNSHARED"))
 
 		return false, nil
 	}
@@ -39,11 +41,19 @@ func EnsureFakeRoot(interactive bool) (bool, error) {
 	if os.Getuid() == 0 &&
 		os.Getenv("ROOTFUL") == constants.TrueString &&
 		os.Getenv("UNSHARED") != constants.TrueString {
-		unshareArgs := []string{"-m"}
-		unshareArgs = append(unshareArgs, os.Args...)
-		cmd = exec.Command("unshare", unshareArgs...)
+		cmd = exec.Command(os.Args[0], os.Args[1:]...)
 		cmd.Env = os.Environ()
+		cmd.Env = append(cmd.Env, "ROOTFUL=true")
 		cmd.Env = append(cmd.Env, "UNSHARED=true")
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			Credential:                 &syscall.Credential{Uid: 0, Gid: 0},
+			Cloneflags:                 syscall.CLONE_NEWNS,
+			GidMappingsEnableSetgroups: true,
+
+			Setsid:     true,
+			Foreground: false,
+			Pdeathsig:  syscall.SIGTERM,
+		}
 	} else {
 		userMap, gidMap, err := GetSubIDRanges()
 		if err != nil {
@@ -74,11 +84,13 @@ func EnsureFakeRoot(interactive bool) (bool, error) {
 		return true, nil
 	}
 
-	// this is needed to completely detach a process
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Foreground: false,
-		Setsid:     true,
+	if cmd.SysProcAttr == nil {
+		cmd.SysProcAttr = &syscall.SysProcAttr{}
 	}
+
+	// this is needed to completely detach a process
+	cmd.SysProcAttr.Foreground = false
+	cmd.SysProcAttr.Setsid = true
 
 	logging.LogDebug("tty not specified, using cmd.Start")
 

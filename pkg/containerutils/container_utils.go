@@ -348,23 +348,25 @@ func Start(interactive, tty bool, config utils.Config) error {
 		return err
 	}
 
-	logging.LogDebug("injecting pty agent")
+	if !fileutils.Exist(filepath.Join(path, constants.PtyAgentPath)) {
+		logging.LogDebug("injecting pty agent")
 
-	err = os.MkdirAll(filepath.Join(path, filepath.Base(constants.PtyAgentPath)), 0755)
-	if err != nil {
-		logging.LogError("failed to create path for pty agent: %v", err)
+		err = os.MkdirAll(filepath.Join(path, filepath.Base(constants.PtyAgentPath)), 0o755)
+		if err != nil {
+			logging.LogError("failed to create path for pty agent: %v", err)
 
-		return err
+			return err
+		}
+
+		err = fileutils.WriteFile(filepath.Join(path, constants.PtyAgentPath), ptyFile, 0o755)
+		if err != nil {
+			logging.LogError("failed to inject pty agent: %v", err)
+
+			return err
+		}
+
+		logging.LogDebug("pty agent injected")
 	}
-
-	err = fileutils.WriteFile(filepath.Join(path, constants.PtyAgentPath), ptyFile, 0o755)
-	if err != nil {
-		logging.LogError("failed to inject pty agent: %v", err)
-
-		return err
-	}
-
-	logging.LogDebug("pty agent injected")
 
 	if !fileutils.Exist(filepath.Join(path, constants.PtyAgentPath)) {
 		logging.LogError(
@@ -377,8 +379,6 @@ func Start(interactive, tty bool, config utils.Config) error {
 			filepath.Join(path, constants.PtyAgentPath),
 		)
 	}
-
-	logging.LogDebug("ready to start the container")
 
 	logging.LogDebug("ready to start the container")
 
@@ -438,12 +438,8 @@ func Exec(pid int, interactive bool, tty bool, config utils.Config) error {
 }
 
 // Stop will find all the processes in given container and will stop them.
-func Stop(name string, force bool, timeout int, signal string) error {
+func Stop(name string, force bool, timeout int) error {
 	logging.LogDebug("stopping container %s", name)
-
-	if signal == "" {
-		signal = "SIGTERM"
-	}
 
 	containerPid, err := GetPid(name)
 	if err != nil {
@@ -456,12 +452,12 @@ func Stop(name string, force bool, timeout int, signal string) error {
 	if force {
 		logging.LogDebug("killing process with pid: %d", containerPid)
 
-		return exec.Command("kill", "-SIGKILL", strconv.Itoa(containerPid)).Run()
+		return syscall.Kill(containerPid, syscall.SIGKILL)
 	}
 
 	logging.LogDebug("sending SIGTERM to pid: %d", containerPid)
 
-	err = exec.Command("kill", "-"+signal, strconv.Itoa(containerPid)).Run()
+	err = syscall.Kill(containerPid, syscall.SIGTERM)
 	if err != nil {
 		return err
 	}
@@ -470,7 +466,7 @@ func Stop(name string, force bool, timeout int, signal string) error {
 		if timeout <= 0 {
 			logging.LogWarning("timeout exceeded, force killing")
 
-			return exec.Command("kill", "-SIGKILL", strconv.Itoa(containerPid)).Run()
+			return syscall.Kill(containerPid, syscall.SIGKILL)
 		}
 
 		time.Sleep(time.Second)

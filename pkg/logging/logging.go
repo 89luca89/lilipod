@@ -150,7 +150,10 @@ func ReadLog(file io.Reader, since, until int64, follow, timestamps bool) error 
 				continue
 			}
 			// else print to stdout
-			fmt.Fprintf(os.Stdout, "%s", content)
+			_, err = fmt.Fprintf(os.Stdout, "%s", content)
+			if err != nil {
+				return err
+			}
 		}
 	}
 

@@ -13,7 +13,7 @@ const FilterSeparator = "\000"
 const BusyboxURL = "https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox"
 
 // PtyAgentPath is the path inside the container where we put the pty agent.
-const PtyAgentPath = "/usr/sbin/pty"
+const PtyAgentPath = "/sbin/pty"
 
 // TrueString is useful for easy string comparisons with bools.
 const TrueString = "true"

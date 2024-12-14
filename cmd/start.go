@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
+	"time"
 
 	"github.com/89luca89/lilipod/pkg/containerutils"
 	"github.com/89luca89/lilipod/pkg/fileutils"
-	"github.com/89luca89/lilipod/pkg/imageutils"
 	"github.com/89luca89/lilipod/pkg/logging"
 	"github.com/89luca89/lilipod/pkg/procutils"
 	"github.com/89luca89/lilipod/pkg/utils"
@@ -70,15 +71,17 @@ func start(cmd *cobra.Command, arguments []string) error {
 	if startAll {
 		arguments = []string{}
 
-		images, err := os.ReadDir(imageutils.ImageDir)
+		containers, err := os.ReadDir(containerutils.ContainerDir)
 		if err != nil {
 			return err
 		}
 
-		for _, i := range images {
+		for _, i := range containers {
 			arguments = append(arguments, i.Name())
 		}
 	}
+
+	var wg sync.WaitGroup
 
 	for _, container := range arguments {
 		// ensure a container for this name is already running
@@ -101,16 +104,17 @@ func start(cmd *cobra.Command, arguments []string) error {
 
 			logging.LogDebug("starting: %s", container)
 
-			err = containerutils.Start(interactive, tty, config)
-			if err != nil {
-				return err
-			}
+			wg.Add(1)
+			go containerutils.Start(interactive, tty, config)
+
+			// wait for routine to correctly statt
+			time.Sleep(time.Millisecond * 250)
 		} else {
 			return fmt.Errorf("container %s does not exist", container)
 		}
-
-		fmt.Println(container)
 	}
+
+	wg.Wait()
 
 	return nil
 }
