@@ -348,23 +348,25 @@ func Start(interactive, tty bool, config utils.Config) error {
 		return err
 	}
 
-	logging.LogDebug("injecting pty agent")
+	if !fileutils.Exist(filepath.Join(path, constants.PtyAgentPath)) {
+		logging.LogDebug("injecting pty agent")
 
-	err = os.MkdirAll(filepath.Join(path, filepath.Base(constants.PtyAgentPath)), 0755)
-	if err != nil {
-		logging.LogError("failed to create path for pty agent: %v", err)
+		err = os.MkdirAll(filepath.Join(path, filepath.Base(constants.PtyAgentPath)), 0o755)
+		if err != nil {
+			logging.LogError("failed to create path for pty agent: %v", err)
 
-		return err
+			return err
+		}
+
+		err = fileutils.WriteFile(filepath.Join(path, constants.PtyAgentPath), ptyFile, 0o755)
+		if err != nil {
+			logging.LogError("failed to inject pty agent: %v", err)
+
+			return err
+		}
+
+		logging.LogDebug("pty agent injected")
 	}
-
-	err = fileutils.WriteFile(filepath.Join(path, constants.PtyAgentPath), ptyFile, 0o755)
-	if err != nil {
-		logging.LogError("failed to inject pty agent: %v", err)
-
-		return err
-	}
-
-	logging.LogDebug("pty agent injected")
 
 	if !fileutils.Exist(filepath.Join(path, constants.PtyAgentPath)) {
 		logging.LogError(
@@ -377,8 +379,6 @@ func Start(interactive, tty bool, config utils.Config) error {
 			filepath.Join(path, constants.PtyAgentPath),
 		)
 	}
-
-	logging.LogDebug("ready to start the container")
 
 	logging.LogDebug("ready to start the container")
 
