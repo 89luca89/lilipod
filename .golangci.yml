@@ -36,11 +36,10 @@ linters:
   # enable-all: true
   fase: false
   disable:
+    - err113            # I do use fmt.Errorf, allocating all of them at the start is counter productive.
     - exhaustruct       # too noisy
-    - gomnd             # too noisy
     - forbidigo         # I need to use println this is a CLI app.
     - gochecknoglobals  # Sometimes they are useful.
-    - goerr113          # I do use fmt.Errorf, allocating all of them at the start is counter productive.
     - cyclop            # To be enabled in the future
     - funlen            # To be enabled in the future
     - gocognit          # To be enabled in the future
@@ -62,9 +61,7 @@ linters:
     - errchkjson
     - errname
     - errorlint
-    - execinquery
     - exhaustive
-    - exportloopref
     - forcetypeassert
     - gci
     - ginkgolinter
