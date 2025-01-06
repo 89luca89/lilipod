@@ -11,8 +11,6 @@ github.com/docker/cli/cli/config/types
 # github.com/docker/distribution v2.8.3+incompatible
 ## explicit
 github.com/docker/distribution/registry/client/auth/challenge
-# github.com/docker/docker v27.4.0+incompatible
-## explicit
 # github.com/docker/docker-credential-helpers v0.8.2
 ## explicit; go 1.19
 github.com/docker/docker-credential-helpers/client
@@ -106,7 +104,7 @@ github.com/vbatts/tar-split/archive/tar
 # golang.org/x/sync v0.10.0
 ## explicit; go 1.18
 golang.org/x/sync/errgroup
-# golang.org/x/sys v0.28.0
+# golang.org/x/sys v0.29.0
 ## explicit; go 1.18
 golang.org/x/sys/plan9
 golang.org/x/sys/unix

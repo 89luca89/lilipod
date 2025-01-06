@@ -10,14 +10,13 @@ require (
 	github.com/pkg/term v1.1.0
 	github.com/schollz/progressbar/v3 v3.17.1
 	github.com/spf13/cobra v1.8.1
-	golang.org/x/sys v0.28.0
+	golang.org/x/sys v0.29.0
 )
 
 require (
 	github.com/containerd/stargz-snapshotter/estargz v0.16.3 // indirect
 	github.com/docker/cli v27.4.0+incompatible // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
-	github.com/docker/docker v27.4.0+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.8.2 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
