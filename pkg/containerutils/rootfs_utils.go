@@ -766,15 +766,19 @@ func setCapabilities(keepCaps ...string) error {
 	}
 
 	knownCapsList := capability.ListKnown()
+
 	for _, capSpec := range keepCaps {
 		// nocap
 		capToSet := capability.Cap(-1)
+
 		for _, c := range knownCapsList {
 			if strings.EqualFold(c.String(), capSpec) {
 				capToSet = c
+
 				break
 			}
 		}
+
 		caps.Set(capability.BOUNDING, capToSet)
 		caps.Set(capability.EFFECTIVE, capToSet)
 		caps.Set(capability.PERMITTED, capToSet)
@@ -783,9 +787,11 @@ func setCapabilities(keepCaps ...string) error {
 	if err = caps.Apply(capability.CAPS | capability.BOUNDS | capability.AMBS); err != nil {
 		return fmt.Errorf("setting capabilities: %w", err)
 	}
-	caps, err = capability.NewPid2(0)
+
+	_, err = capability.NewPid2(0)
 	if err != nil {
 		return fmt.Errorf("reading capabilities of current process: %w", err)
 	}
+
 	return nil
 }
