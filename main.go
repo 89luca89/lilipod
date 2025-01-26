@@ -40,6 +40,9 @@ import (
 //go:embed pty.tar.gz
 var pty []byte
 
+//go:embed busybox
+var busybox []byte
+
 func newApp() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:              "lilipod",
@@ -95,7 +98,7 @@ func setEnviron() error {
 		}
 	}
 
-	return utils.EnsureUNIXDependencies(pty)
+	return utils.EnsureUNIXDependencies(pty, busybox)
 }
 
 func main() {

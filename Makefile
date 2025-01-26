@@ -1,6 +1,6 @@
 .PHONY: all lilipod pty coverage
 
-all: clean pty lilipod
+all: busybox pty lilipod
 
 clean:
 	@rm -f lilipod
@@ -19,7 +19,11 @@ coverage:
 	@rm -f pty.tar.gz
 	CGO_ENABLED=0 go build -mod vendor -gcflags=all="-l -B -C" -ldflags="-s -w" -o pty ptyagent/main.go ptyagent/pty.go
 	tar czfv pty.tar.gz pty
+	@wget -c "https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox"
 	CGO_ENABLED=0 go build -mod vendor -cover -o coverage/lilipod main.go
+
+busybox:
+	@wget -c "https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox"
 
 pty:
 	@rm -f pty

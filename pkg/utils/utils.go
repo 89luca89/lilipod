@@ -2,23 +2,18 @@
 package utils
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/89luca89/lilipod/pkg/constants"
 	"github.com/89luca89/lilipod/pkg/fileutils"
 	"github.com/89luca89/lilipod/pkg/logging"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
-	"github.com/schollz/progressbar/v3"
 )
 
 // Config is a struct that holds the information
@@ -196,7 +191,7 @@ func GetLilipodHome() string {
 //
 // Additionally the ptyAgent will be saved into lilipod's bin directory, ready to be
 // injected in the containers.
-func EnsureUNIXDependencies(ptyAgent []byte) error {
+func EnsureUNIXDependencies(ptyAgent []byte, busybox []byte) error {
 	hardDependencies := []string{
 		"getsubids",
 		"newuidmap",
@@ -236,7 +231,7 @@ func EnsureUNIXDependencies(ptyAgent []byte) error {
 	if depFail {
 		logging.LogWarning("some dependencies are not found, trying to setup busybox locally")
 
-		return setupBusybox(softDependencies)
+		return setupBusybox(busybox, softDependencies)
 	}
 
 	logging.LogDebug("ensuring agent pty")
@@ -279,61 +274,12 @@ func EnsureUNIXDependencies(ptyAgent []byte) error {
 
 // setupBusybox will download the busybox statically compiled binary and
 // symlink missing dependencies into LILIPOD_HOME/bin.
-func setupBusybox(dependencies []string) error {
+func setupBusybox(busybox []byte, dependencies []string) error {
 	_ = os.MkdirAll(LilipodBinPath, os.ModePerm)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-	defer cancel()
-
-	// Get the data
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, constants.BusyboxURL, nil)
+	err := fileutils.WriteFile(filepath.Join(LilipodBinPath, "busybox"), busybox, 0o755)
 	if err != nil {
-		logging.Log("error: %+v", err)
-
-		return err
-	}
-
-	client := &http.Client{}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		logging.Log("error: %+v", err)
-
-		return err
-	}
-
-	defer func() { _ = resp.Body.Close() }()
-
-	// Create the file
-	out, err := os.Create(filepath.Join(LilipodBinPath, "busybox"))
-	if err != nil {
-		logging.Log("error: %+v", err)
-
-		return err
-	}
-
-	defer func() { _ = out.Close() }()
-
-	bar := progressbar.NewOptions64(resp.ContentLength,
-		progressbar.OptionEnableColorCodes(true),
-		progressbar.OptionShowBytes(true),
-		progressbar.OptionSetWidth(30),
-		progressbar.OptionSetDescription("Downloading busybox..."),
-		progressbar.OptionOnCompletion(func() {
-			println(" done ")
-		}),
-	)
-
-	_, err = io.Copy(io.MultiWriter(out, bar), resp.Body)
-	if err != nil {
-		logging.Log("error: %+v", err)
-
-		return err
-	}
-
-	err = os.Chmod(out.Name(), 0o755)
-	if err != nil {
-		logging.Log("error: %+v", err)
+		logging.Log("failed to setup dependency 'busybox': %v", err)
 
 		return err
 	}
