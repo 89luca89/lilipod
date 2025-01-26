@@ -16,6 +16,7 @@ import (
 	"github.com/89luca89/lilipod/pkg/logging"
 	"github.com/89luca89/lilipod/pkg/procutils"
 	"github.com/89luca89/lilipod/pkg/utils"
+	"github.com/moby/sys/capability"
 )
 
 // Limit access to host's kernel stuff -> /dev/null.
@@ -723,6 +724,11 @@ func RunContainer(tty bool, conf utils.Config) error {
 		return err
 	}
 
+	if err := setCapabilities(keepCaps...); err != nil {
+		fmt.Fprintf(os.Stderr, "error setting capabilities for process: %v\n", err)
+		os.Exit(1)
+	}
+
 	if tty {
 		args := append([]string{constants.PtyAgentPath}, conf.Entrypoint...)
 
@@ -734,4 +740,52 @@ func RunContainer(tty bool, conf utils.Config) error {
 	logging.LogDebug("execute entrypoint: %s", conf.Entrypoint)
 
 	return syscall.Exec(commandPath, conf.Entrypoint, conf.Env)
+}
+
+var keepCaps = []string{
+	"chown",
+	"dac_override",
+	"fsetid",
+	"fowner",
+	"mknod",
+	"net_raw",
+	"setgid",
+	"setuid",
+	"setfcap",
+	"setpcap",
+	"net_bind_service",
+	"sys_chroot",
+	"kill",
+	"audit_write",
+}
+
+func setCapabilities(keepCaps ...string) error {
+	caps, err := capability.NewPid2(0)
+	if err != nil {
+		return fmt.Errorf("reading capabilities of current process: %w", err)
+	}
+
+	knownCapsList := capability.ListKnown()
+	for _, capSpec := range keepCaps {
+		// nocap
+		capToSet := capability.Cap(-1)
+		for _, c := range knownCapsList {
+			if strings.EqualFold(c.String(), capSpec) {
+				capToSet = c
+				break
+			}
+		}
+		caps.Set(capability.BOUNDING, capToSet)
+		caps.Set(capability.EFFECTIVE, capToSet)
+		caps.Set(capability.PERMITTED, capToSet)
+	}
+
+	if err = caps.Apply(capability.CAPS | capability.BOUNDS | capability.AMBS); err != nil {
+		return fmt.Errorf("setting capabilities: %w", err)
+	}
+	caps, err = capability.NewPid2(0)
+	if err != nil {
+		return fmt.Errorf("reading capabilities of current process: %w", err)
+	}
+	return nil
 }

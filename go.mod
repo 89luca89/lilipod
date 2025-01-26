@@ -7,6 +7,7 @@ toolchain go1.23.4
 require (
 	github.com/google/go-containerregistry v0.20.3
 	github.com/jedib0t/go-pretty/v6 v6.6.5
+	github.com/moby/sys/capability v0.4.0
 	github.com/pkg/term v1.1.0
 	github.com/schollz/progressbar/v3 v3.17.1
 	github.com/spf13/cobra v1.8.1
