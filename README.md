@@ -15,7 +15,7 @@ Sounds like little-pod, and I like it.
 
 Lilipod is a very simple container manager with minimal features to:
 
-- Download and manager images
+- Download and manage images
 - Create and run containers 
 
 It tries to keep a **somewhat** compatible CLI interface with Podman/Docker/Nerdctl
