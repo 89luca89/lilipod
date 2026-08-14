@@ -724,9 +724,11 @@ func RunContainer(tty bool, conf utils.Config) error {
 		return err
 	}
 
-	if err := setCapabilities(keepCaps...); err != nil {
-		fmt.Fprintf(os.Stderr, "error setting capabilities for process: %v\n", err)
-		os.Exit(1)
+	if !conf.Privileged {
+		if err := setCapabilities(keepCaps...); err != nil {
+			fmt.Fprintf(os.Stderr, "error setting capabilities for process: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	if tty {
