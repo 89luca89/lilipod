@@ -243,11 +243,32 @@ func CreateRootfs(image string, name string, createConfig utils.Config, uid, gid
 
 	logging.LogDebug("setting up custom configs")
 
-	logging.LogDebug("appending custom env to default image env")
-	// append custom env to default image env
-	createConfig.Env = append(createConfig.Env, config.Config.Env...)
-	createConfig.Env = append(createConfig.Env, "HOSTNAME="+createConfig.Hostname)
-	createConfig.Env = append(createConfig.Env, "TERM=xterm")
+	logging.LogDebug("merging custom env with default image env")
+	// Merge image defaults and custom values with the last value for each key winning.
+	envIndexes := make(map[string]int, len(config.Config.Env)+len(createConfig.Env))
+	mergedEnv := make([]string, 0, len(config.Config.Env)+len(createConfig.Env)+2)
+
+	setEnv := func(value string) {
+		key, _, _ := strings.Cut(value, "=")
+		if index, exists := envIndexes[key]; exists {
+			mergedEnv[index] = value
+			return
+		}
+
+		envIndexes[key] = len(mergedEnv)
+		mergedEnv = append(mergedEnv, value)
+	}
+
+	for _, value := range config.Config.Env {
+		setEnv(value)
+	}
+	for _, value := range createConfig.Env {
+		setEnv(value)
+	}
+
+	setEnv("HOSTNAME=" + createConfig.Hostname)
+	setEnv("TERM=xterm")
+	createConfig.Env = mergedEnv
 
 	// if empty entrypoint, default to image default entrypoint
 	if len(createConfig.Entrypoint) == 0 || createConfig.Entrypoint == nil {
@@ -652,7 +673,12 @@ func generateEnterCommand(config utils.Config) (*exec.Cmd, error) {
 //	nsenter -m -u -U --preserve-credentials -i -n -p -S 1000 -G 1000 \
 //	    -r/proc/11111/root -w/proc/11111/root/tmp/ -t 11111 command-to-run
 func generateExecCommand(containerPid string, tty bool, config utils.Config) *exec.Cmd {
-	args := []string{"-m", "-u", "-U", "--preserve-credentials"}
+	args := []string{"-m", "-u"}
+
+	if config.Userns == constants.KeepID &&
+		os.Getenv("ROOTFUL") != constants.TrueString {
+		args = append(args, "-U", "--preserve-credentials")
+	}
 
 	if config.Ipc == constants.Private {
 		args = append(args, "-i")
