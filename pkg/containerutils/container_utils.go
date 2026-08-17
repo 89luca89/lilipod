@@ -652,7 +652,12 @@ func generateEnterCommand(config utils.Config) (*exec.Cmd, error) {
 //	nsenter -m -u -U --preserve-credentials -i -n -p -S 1000 -G 1000 \
 //	    -r/proc/11111/root -w/proc/11111/root/tmp/ -t 11111 command-to-run
 func generateExecCommand(containerPid string, tty bool, config utils.Config) *exec.Cmd {
-	args := []string{"-m", "-u", "-U", "--preserve-credentials"}
+	args := []string{"-m", "-u"}
+
+	if config.Userns == constants.KeepID &&
+		os.Getenv("ROOTFUL") != constants.TrueString {
+		args = append(args, "-U", "--preserve-credentials")
+	}
 
 	if config.Ipc == constants.Private {
 		args = append(args, "-i")
