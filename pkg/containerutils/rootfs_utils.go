@@ -437,6 +437,10 @@ func setupVolumes(path string, conf utils.Config) error {
 
 		modeUint := syscall.MS_BIND | syscall.MS_REC
 
+		if strings.Contains(mode, "ro") {
+			modeUint |= syscall.MS_RDONLY
+		}
+
 		if strings.Contains(mode, "rslave") {
 			modeUint |= syscall.MS_SLAVE | syscall.MS_REC
 		}
