@@ -262,21 +262,53 @@ func Mount(src, dest string, mode uintptr) error {
 
 	logging.LogDebug("ensuring destination point %s exists", dest)
 
+	destInfo, err := os.Lstat(dest)
+	if err == nil && destInfo.Mode()&os.ModeSymlink != 0 {
+		if err := os.Remove(dest); err != nil {
+			return err
+		}
+	} else if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
 	if info.IsDir() {
 		_ = os.MkdirAll(dest, 0o755)
-	} else {
-		file, _ := os.Create(dest)
+	} else if !Exist(dest) {
+		file, err := os.OpenFile(dest, os.O_RDONLY|os.O_CREATE, 0o644)
+		if err != nil {
+			return err
+		}
 
 		defer func() { _ = file.Close() }()
 	}
 
 	logging.LogDebug("mounting %s on %s as bind, with mode %s", src, dest, mode)
 
-	return syscall.Mount(src,
+	err = syscall.Mount(src,
 		dest,
 		"bind",
 		mode,
 		"")
+	if err != nil {
+		return err
+	}
+
+	if mode&syscall.MS_RDONLY != 0 {
+		privateMode := uintptr(syscall.MS_PRIVATE)
+		if info.IsDir() {
+			privateMode |= syscall.MS_REC
+		}
+		if err := syscall.Mount("", dest, "", privateMode, ""); err != nil {
+			return err
+		}
+
+		remountMode := mode & (syscall.MS_NOSUID | syscall.MS_NOEXEC | syscall.MS_NODEV)
+		remountMode |= syscall.MS_BIND | syscall.MS_REMOUNT | syscall.MS_RDONLY
+
+		return syscall.Mount("", dest, "", remountMode, "")
+	}
+
+	return nil
 }
 
 // MountCgroup will mount a new cgroup/cgroup2 fs on dest.
