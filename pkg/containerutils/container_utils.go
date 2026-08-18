@@ -84,6 +84,7 @@ func GetRootfsDir(name string) string {
 func GetPid(id string) (int, error) {
 	id = GetID(id)
 	idb := []byte(id)
+	candidate := -1
 
 	processes, err := os.ReadDir("/proc")
 	if err != nil {
@@ -101,15 +102,38 @@ func GetPid(id string) (int, error) {
 			continue
 		}
 
-		// if the maps file contains the ID of the container, we found it
-		if bytes.Contains(filedata, idb) {
-			pid, err := strconv.ParseInt(proc.Name(), 10, 32)
-			if err != nil {
-				return -1, err
-			}
-
-			return int(pid), nil
+		if !bytes.Contains(filedata, idb) {
+			continue
 		}
+
+		pid, err := strconv.ParseInt(proc.Name(), 10, 32)
+		if err != nil {
+			return -1, err
+		}
+
+		// Every process in the container can read the same .containerenv.
+		// Prefer PID 1 in the container's PID namespace, rather than the
+		// first lexicographically sorted /proc entry.
+		status, err := os.ReadFile(filepath.Join("/proc", proc.Name(), "status"))
+		if err == nil {
+			for _, line := range strings.Split(string(status), "\n") {
+				fields := strings.Fields(line)
+				if len(fields) > 1 && fields[0] == "NSpid:" &&
+					fields[len(fields)-1] == "1" {
+					return int(pid), nil
+				}
+			}
+		}
+
+		// pid=host has no nested PID 1. The initial process is normally the
+		// oldest matching process, so keep the lowest numeric PID as fallback.
+		if candidate < 0 || int(pid) < candidate {
+			candidate = int(pid)
+		}
+	}
+
+	if candidate > 0 {
+		return candidate, nil
 	}
 
 	return -1, fmt.Errorf("container %s is not running", id)
