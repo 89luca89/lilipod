@@ -28,6 +28,7 @@ import (
 	"github.com/89luca89/lilipod/pkg/utils"
 	"github.com/google/go-containerregistry/pkg/legacy"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"golang.org/x/sys/unix"
 )
 
 // ContainerDir is the default location for downloaded images.
@@ -437,6 +438,86 @@ func Exec(pid int, interactive bool, tty bool, config utils.Config) error {
 	return procutils.RunDetached(cmd, logfile)
 }
 
+func waitForPidfd(pidfd int, timeout time.Duration) (bool, error) {
+	if timeout <= 0 {
+		return false, nil
+	}
+
+	deadline := time.Now().Add(timeout)
+	pollfds := []unix.PollFd{{Fd: int32(pidfd), Events: unix.POLLIN}}
+
+	for {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return false, nil
+		}
+
+		pollfds[0].Revents = 0
+		milliseconds := int((remaining + time.Millisecond - 1) / time.Millisecond)
+		ready, err := unix.Poll(pollfds, milliseconds)
+		if errors.Is(err, unix.EINTR) {
+			continue
+		}
+		if err != nil {
+			return false, err
+		}
+		if ready == 0 {
+			return false, nil
+		}
+		if pollfds[0].Revents&(unix.POLLIN|unix.POLLHUP) != 0 {
+			return true, nil
+		}
+
+		return false, fmt.Errorf("unexpected pidfd poll events: %#x", pollfds[0].Revents)
+	}
+}
+
+func signalPidfdAndWait(pidfd int, signal unix.Signal, timeout time.Duration) (bool, error) {
+	err := unix.PidfdSendSignal(pidfd, signal, nil, 0)
+	if errors.Is(err, unix.ESRCH) {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+
+	return waitForPidfd(pidfd, timeout)
+}
+
+const forceKillWaitTimeout = 5 * time.Second
+
+func stopPidfd(pidfd int, force bool, timeout time.Duration) error {
+	stopSignal := unix.SIGTERM
+	waitTimeout := timeout
+	if force {
+		stopSignal = unix.SIGKILL
+		waitTimeout = forceKillWaitTimeout
+	}
+
+	exited, err := signalPidfdAndWait(pidfd, stopSignal, waitTimeout)
+	if err != nil {
+		return err
+	}
+	if exited {
+		return nil
+	}
+	if force {
+		return errors.New("container process did not exit after SIGKILL")
+	}
+
+	logging.LogWarning("timeout exceeded, force killing")
+
+	exited, err = signalPidfdAndWait(pidfd, unix.SIGKILL, forceKillWaitTimeout)
+	if err != nil {
+		return err
+	}
+	if !exited {
+		return errors.New("container process did not exit after SIGKILL")
+	}
+
+	return nil
+}
+
 // Stop will find all the processes in given container and will stop them.
 func Stop(name string, force bool, timeout int) error {
 	logging.LogDebug("stopping container %s", name)
@@ -446,40 +527,18 @@ func Stop(name string, force bool, timeout int) error {
 		return err
 	}
 
-	logging.LogDebug("container pid is %d", containerPid)
-	logging.LogDebug("terminating pid: %d", containerPid)
-
-	if force {
-		logging.LogDebug("killing process with pid: %d", containerPid)
-
-		return syscall.Kill(containerPid, syscall.SIGKILL)
+	pidfd, err := unix.PidfdOpen(containerPid, 0)
+	if errors.Is(err, unix.ESRCH) {
+		return nil
 	}
-
-	logging.LogDebug("sending SIGTERM to pid: %d", containerPid)
-
-	err = syscall.Kill(containerPid, syscall.SIGTERM)
 	if err != nil {
-		return err
+		return fmt.Errorf("open pidfd for container %s: %w", name, err)
 	}
+	defer unix.Close(pidfd)
 
-	for {
-		if timeout <= 0 {
-			logging.LogWarning("timeout exceeded, force killing")
+	logging.LogDebug("container pid is %d", containerPid)
 
-			return syscall.Kill(containerPid, syscall.SIGKILL)
-		}
-
-		time.Sleep(time.Second)
-
-		containerPid, _ = GetPid(name)
-		if containerPid < 1 {
-			break
-		}
-
-		timeout--
-	}
-
-	return nil
+	return stopPidfd(pidfd, force, time.Duration(timeout)*time.Second)
 }
 
 // Inspect will return a JSON or a formatted string describing the input containers.
