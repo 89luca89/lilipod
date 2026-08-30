@@ -371,6 +371,9 @@ func RunDetached(cmd *exec.Cmd, logfile string) error {
 	logging.LogDebug("no interactive and no tty, setting up process log file")
 
 	// non interactive mode, save stdout and stderr to file and disown
+	if cmd.SysProcAttr == nil {
+		cmd.SysProcAttr = &syscall.SysProcAttr{}
+	}
 	cmd.SysProcAttr.Foreground = false
 	cmd.SysProcAttr.Setsid = true
 
@@ -447,6 +450,13 @@ func RunDetached(cmd *exec.Cmd, logfile string) error {
 		}
 	}()
 
+	logging.LogDebug("no interactive and no tty, start process in background")
+
+	err = cmd.Start()
+	if err != nil {
+		return err
+	}
+
 	// keep an eye on the child process, and exit if dead
 	go func() {
 		defer wg.Done()
@@ -459,13 +469,6 @@ func RunDetached(cmd *exec.Cmd, logfile string) error {
 			}
 		}
 	}()
-
-	logging.LogDebug("no interactive and no tty, start process in background")
-
-	err = cmd.Start()
-	if err != nil {
-		return err
-	}
 
 	wg.Wait()
 
