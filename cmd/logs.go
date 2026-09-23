@@ -65,9 +65,19 @@ func logs(cmd *cobra.Command, arguments []string) error {
 		return err
 	}
 
-	_, err = os.Create(containerutils.GetDir(container) + "/current-logs")
-	if err != nil {
-		return err
+	// Ensure the log file exists, but do not truncate it if it's already
+	// there. "start" (via procutils.RunDetached) already created this
+	// file and wrote the container's stdout/stderr into it; blindly
+	// os.Create()-ing it here truncates that content to zero bytes right
+	// before we open it for reading, so every "logs" call -- including
+	// the one distrobox makes right after a failed "start" to explain
+	// what went wrong -- silently returns nothing, destroying the very
+	// diagnostic it was trying to show.
+	if !fileutils.Exist(containerutils.GetDir(container) + "/current-logs") {
+		_, err = os.Create(containerutils.GetDir(container) + "/current-logs")
+		if err != nil {
+			return err
+		}
 	}
 
 	file, err := os.Open(containerutils.GetDir(container) + "/current-logs")
