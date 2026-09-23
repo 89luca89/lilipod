@@ -84,19 +84,26 @@ func setupCgroupfs(conf utils.Config) error {
 
 	// move our process to a dedicated scope, so that eventual init systems
 	// won't encour problems with unknown PIDs
-	err = os.MkdirAll("/sys/fs/cgroup/container-"+conf.Names+".scope", 0o755)
+	scope := "/sys/fs/cgroup/container-" + conf.Names + ".scope"
+	err = os.MkdirAll(scope, 0o755)
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot create cgroup %s: %w", scope, err)
 	}
 
-	file, err := os.Create("/sys/fs/cgroup/container-" + conf.Names + ".scope/cgroup.procs")
+	file, err := os.Create(scope + "/cgroup.procs")
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot open %s/cgroup.procs: %w", scope, err)
 	}
+
+	defer file.Close()
 
 	_, err = fmt.Fprint(file, 0)
+	if err != nil {
+		return fmt.Errorf("cannot move the container process into %s: %w\n",
+			scope, err)
+	}
 
-	return err
+	return nil
 }
 
 // we need to setup the /dev/pts mountpoint, by mounting a new devpts filesystem

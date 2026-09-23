@@ -1,4 +1,4 @@
-.PHONY: all lilipod pty coverage
+.PHONY: all coverage clean
 
 all: busybox pty lilipod
 
@@ -7,8 +7,7 @@ clean:
 	@rm -f pty
 	@rm -f pty.tar.gz
 
-lilipod:
-	@rm -f lilipod
+lilipod: pty.tar.gz
 	CGO_ENABLED=0 go build -mod vendor -ldflags="-s -w -X 'github.com/89luca89/lilipod/pkg/constants.Version=$${RELEASE_VERSION:-0.0.0}'" -o lilipod main.go
 
 coverage:
@@ -26,9 +25,9 @@ busybox:
 	@wget -c "https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox"
 
 pty:
-	@rm -f pty
-	@rm -f pty.tar.gz
 	CGO_ENABLED=0 go build -mod vendor -gcflags=all="-l -B -C" -ldflags="-s -w -X 'main.version=$${RELEASE_VERSION:-0.0.0}'" -o pty ptyagent/main.go ptyagent/pty.go
+
+pty.tar.gz: pty
 	tar czfv pty.tar.gz pty
 
 trivy:

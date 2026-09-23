@@ -31,12 +31,19 @@ func NewRmCommand() *cobra.Command {
 	rmCommand.Flags().BoolP("force", "f", false, "force remove container")
 	rmCommand.Flags().BoolP("all", "a", false, "remove all containers")
 	rmCommand.Flags().BoolP("help", "h", false, "show help")
+	rmCommand.Flags().BoolP("volumes", "v", false, "remove anonymous volumes associated with the container")
 
 	return rmCommand
 }
 
 func rm(cmd *cobra.Command, arguments []string) error {
 	force, err := cmd.Flags().GetBool("force")
+	if err != nil {
+		return err
+	}
+
+	// accepted for compatibility with podman/docker/distrobox; no-op
+	_, err = cmd.Flags().GetBool("volumes")
 	if err != nil {
 		return err
 	}
