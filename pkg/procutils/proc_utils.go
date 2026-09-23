@@ -3,6 +3,7 @@ package procutils
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -92,6 +93,18 @@ func EnsureFakeRoot(interactive bool) (bool, error) {
 	cmd.SysProcAttr.Foreground = false
 	cmd.SysProcAttr.Setsid = true
 
+	// preserve the detached child's output, so failures show more than
+	// "exit status 1".
+	startLog, logErr := os.Create(GetStartLogPath())
+	if logErr != nil {
+		logging.LogDebug("could not create start log: %v", logErr)
+	} else {
+		defer startLog.Close()
+
+		cmd.Stdout = startLog
+		cmd.Stderr = startLog
+	}
+
 	logging.LogDebug("tty not specified, using cmd.Start")
 
 	err := cmd.Start()
@@ -104,6 +117,18 @@ func EnsureFakeRoot(interactive bool) (bool, error) {
 	logging.LogDebug("tty not specified, waiting for child to start")
 	time.Sleep(time.Millisecond * 250)
 
+	// report what a child dead during setup wrote instead of returning
+	// success and leaving a stopped container behind.
+	if !IsPidRunning(cmd.Process.Pid) {
+		_ = cmd.Wait()
+
+		if reason := strings.TrimSpace(ReadStartLog()); reason != "" {
+			return false, errors.New("container setup failed:\n" + reason)
+		}
+
+		return false, fmt.Errorf("container setup failed, see %s", GetStartLogPath())
+	}
+
 	logging.LogDebug("tty not specified, releasing child")
 
 	err = cmd.Process.Release()
@@ -114,6 +139,37 @@ func EnsureFakeRoot(interactive bool) (bool, error) {
 	}
 
 	return true, nil
+}
+
+// GetStartLogPath returns the file a detached container start writes its
+// output to, so setup failures can be reported instead of discarded.
+func GetStartLogPath() string {
+	dir := os.Getenv("XDG_DATA_HOME")
+	if dir == "" {
+		if home, err := os.UserHomeDir(); err == nil {
+			dir = filepath.Join(home, ".local", "share")
+		}
+	}
+
+	if dir == "" {
+		dir = os.TempDir()
+	} else {
+		dir = filepath.Join(dir, "lilipod")
+	}
+
+	_ = os.MkdirAll(dir, 0o755)
+
+	return filepath.Join(dir, "last-start.log")
+}
+
+// ReadStartLog returns the contents of the last detached start log.
+func ReadStartLog() string {
+	out, err := os.ReadFile(GetStartLogPath())
+	if err != nil {
+		return ""
+	}
+
+	return string(out)
 }
 
 // GetUIDGID will return a couple of uid/gid integers for input user.
@@ -190,6 +246,53 @@ func GetUIDGID(username string) (int, int) {
 	return 0, 0
 }
 
+// subIDHelp is the actionable part of the error shown when a user has no
+// subordinate ID ranges. Rootless containers cannot work without them.
+const subIDHelp = "rootless containers need subordinate UID/GID ranges for user %q.\n" +
+	"Add them with:\n" +
+	"    sudo usermod --add-subuids 100000-165535 --add-subgids 100000-165535 %s\n" +
+	"or create /etc/subuid and /etc/subgid containing:\n" +
+	"    %s:100000:65536"
+
+// runGetSubIDs runs getsubids and returns the first range found for username.
+// Any failure is reported with the reason and how to fix it, because a bare
+// exit status here is indistinguishable from every other startup failure.
+func runGetSubIDs(username string, args ...string) ([]string, error) {
+	out, err := exec.Command("getsubids", args...).Output()
+	if err != nil {
+		var execErr *exec.Error
+		if errors.As(err, &execErr) {
+			return nil, fmt.Errorf(
+				"cannot run getsubids: %w\n"+
+					"It is part of shadow-utils built with subordinate ID support, "+
+					"and is required to set up a rootless container",
+				err)
+		}
+
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			reason := strings.TrimSpace(string(exitErr.Stderr))
+			if reason == "" {
+				reason = "no ranges configured"
+			}
+
+			return nil, fmt.Errorf("getsubids %s failed: %s\n"+subIDHelp,
+				strings.Join(args, " "), reason, username, username, username)
+		}
+
+		return nil, err
+	}
+
+	// expected output: "0: <username> <start> <count>"
+	fields := strings.Fields(string(out))
+	if len(fields) < 4 {
+		return nil, fmt.Errorf("unexpected getsubids output %q\n"+subIDHelp,
+			string(out), username, username, username)
+	}
+
+	return fields[2:4], nil
+}
+
 // GetSubIDRanges will return a slice of subUIDs and subGIDs for
 // running user.
 // This function will use the "getsubids" program to discover them.
@@ -201,27 +304,19 @@ func GetSubIDRanges() ([]string, []string, error) {
 		return nil, nil, err
 	}
 
-	subUIDout, err := exec.Command("getsubids", user.Username).Output()
+	subUIDSlice, err := runGetSubIDs(user.Username, user.Username)
 	if err != nil {
 		logging.LogError("%v", err)
 
 		return nil, nil, err
 	}
 
-	subUIDSlice := strings.Split(
-		strings.Trim(string(subUIDout), "\n"),
-		" ")[2:]
-
-	subGIDout, err := exec.Command("getsubids", "-g", user.Username).Output()
+	subGIDSlice, err := runGetSubIDs(user.Username, "-g", user.Username)
 	if err != nil {
 		logging.LogError("%v", err)
 
 		return nil, nil, err
 	}
-
-	subGIDSlice := strings.Split(
-		strings.Trim(string(subGIDout), "\n"),
-		" ")[2:]
 
 	subUIDSlice = append([]string{user.Uid}, subUIDSlice...)
 	subGIDSlice = append([]string{user.Gid}, subGIDSlice...)
@@ -365,6 +460,35 @@ func RunInteractive(cmd *exec.Cmd) error {
 	return cmd.Wait()
 }
 
+// tailLog returns the last max lines of a container log file, with the
+// "<timestamp>:out:"/"<timestamp>:err:" prefixes stripped, so a failure can be
+// reported with the container's own output instead of just an exit status.
+func tailLog(logfile string, max int) string {
+	content, err := os.ReadFile(logfile)
+	if err != nil {
+		return ""
+	}
+
+	lines := []string{}
+
+	for _, line := range strings.Split(strings.TrimRight(string(content), "\n"), "\n") {
+		if parts := strings.SplitN(line, ":", 3); len(parts) == 3 &&
+			(parts[1] == "out" || parts[1] == "err") {
+			line = parts[2]
+		}
+
+		if strings.TrimSpace(line) != "" {
+			lines = append(lines, line)
+		}
+	}
+
+	if len(lines) > max {
+		lines = lines[len(lines)-max:]
+	}
+
+	return strings.Join(lines, "\n")
+}
+
 // RunDetached will run input cmd and redurect all outputs to logfile.
 // No stdin is set up.
 func RunDetached(cmd *exec.Cmd, logfile string) error {
@@ -447,7 +571,9 @@ func RunDetached(cmd *exec.Cmd, logfile string) error {
 		}
 	}()
 
-	// keep an eye on the child process, and exit if dead
+	// keep an eye on the child process: when it is gone, close the log pipes
+	// so the readers below can finish. Exiting 0 here instead would discard
+	// the child's exit status and make a failed start look like a success.
 	go func() {
 		defer wg.Done()
 
@@ -455,7 +581,13 @@ func RunDetached(cmd *exec.Cmd, logfile string) error {
 			time.Sleep(time.Second * 5)
 
 			if !IsPidRunning(cmd.Process.Pid) {
-				os.Exit(0)
+				// let the output copiers drain before tearing the pipes down
+				time.Sleep(time.Second)
+
+				_ = outW.Close()
+				_ = errW.Close()
+
+				return
 			}
 		}
 	}()
@@ -469,5 +601,14 @@ func RunDetached(cmd *exec.Cmd, logfile string) error {
 
 	wg.Wait()
 
-	return cmd.Wait()
+	err = cmd.Wait()
+	if err != nil {
+		if out := tailLog(logfile, 20); out != "" {
+			return fmt.Errorf("container exited: %w\n%s\n(full log: %s)", err, out, logfile)
+		}
+
+		return fmt.Errorf("container exited: %w (output logged to %s)", err, logfile)
+	}
+
+	return nil
 }
